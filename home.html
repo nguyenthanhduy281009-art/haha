@@ -25,10 +25,17 @@
         .delete-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 0, 0, 0.8); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; z-index: 10; display: none; }
         .media-card:hover .delete-btn { display: block; }
 
-        /* Giao diện phóng to */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; }
-        .close-modal { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; font-weight: bold; }
+        /* Giao diện phóng to xem ảnh và video */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; justify-content: center; align-items: center; user-select: none; }
+        .modal-content { max-width: 85%; max-height: 85%; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
+        .close-modal { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; cursor: pointer; font-weight: bold; transition: 0.2s; z-index: 1010; }
+        .close-modal:hover { color: #e94560; }
+
+        /* Nút mũi tên chuyển ảnh */
+        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.15); color: white; border: none; font-size: 35px; padding: 15px 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; z-index: 1010; }
+        .nav-btn:hover { background: rgba(233, 69, 96, 0.8); }
+        .prev-btn { left: 30px; }
+        .next-btn { right: 30px; }
     </style>
 </head>
 <body>
@@ -50,7 +57,9 @@
 
 <div id="mediaModal" class="modal">
     <span class="close-modal" onclick="closeModal()">&times;</span>
-    <div id="modalViewer"></div>
+    <button class="nav-btn prev-btn" onclick="changeMedia(-1)">&#10094;</button>
+    <div id="modalViewer" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;"></div>
+    <button class="nav-btn next-btn" onclick="changeMedia(1)">&#10095;</button>
 </div>
 
 <script>
@@ -67,6 +76,8 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
     let currentUser = null;
+    let mediaList = []; // Mảng danh sách để quản lý thứ tự hình ảnh/video khi lướt xem
+    let currentMediaIndex = -1; // Vị trí file đang mở phóng to
 
     firebase.auth().onAuthStateChanged((user) => {
         if (user) {
@@ -83,7 +94,6 @@
         
         if (!file) return statusTxt.innerText = "Vui lòng chọn file!";
         
-        // Giới hạn dung lượng file dưới 7MB để database chạy mượt
         if (file.size > 7 * 1024 * 1024) {
             return statusTxt.innerText = "File quá lớn! Hãy chọn file dưới 7MB.";
         }
@@ -117,27 +127,39 @@
         firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
             const gallery = document.getElementById("gallery");
             gallery.innerHTML = "";
+            mediaList = []; // Xóa danh sách cũ đi để cập nhật lại từ đầu
             
             snapshot.forEach((childSnapshot) => {
                 const key = childSnapshot.key;
                 const data = childSnapshot.val();
+                
+                // Thêm dữ liệu vào mảng tạm phục vụ tính năng lướt chuyển tiếp
+                mediaList.unshift({ key: key, url: data.url, type: data.type });
+
                 const div = document.createElement("div");
                 div.className = "media-card";
                 
                 let mediaElement = "";
-                let clickAction = `onclick="openModal('${data.url}', '${data.type}')"`;
-
                 if (data.type.includes("image")) {
-                    mediaElement = `<img src="${data.url}" ${clickAction}>`;
+                    mediaElement = `<img src="${data.url}">`;
                 } else if (data.type.includes("video")) {
-                    mediaElement = `<video src="${data.url}" controls></video>`;
+                    mediaElement = `<video src="${data.url}"></video>`;
                 }
+                
+                // Gán sự kiện click vào thẻ bọc ngoài cùng để mở đúng vị trí trong mảng
+                div.setAttribute("onclick", `openModalAtIndex(0)`); 
                 
                 div.innerHTML = `
                     ${mediaElement}
-                    <button class="delete-btn" onclick="deleteFile('${key}')">Xóa</button>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${key}')">Xóa</button>
                 `;
                 gallery.prepend(div);
+            });
+
+            // Cập nhật lại chính xác chỉ số index cho từng thẻ sau khi sắp xếp danh sách ngược (mới nhất lên đầu)
+            const cards = gallery.querySelectorAll('.media-card');
+            cards.forEach((card, index) => {
+                card.setAttribute("onclick", `openModalAtIndex(${index})`);
             });
         });
     }
@@ -151,25 +173,57 @@
         }
     }
 
-    function openModal(url, type) {
+    // Mở khung xem ở vị trí index bất kỳ trong mảng
+    function openModalAtIndex(index) {
+        if (index < 0 || index >= mediaList.length) return;
+        
+        currentMediaIndex = index;
         const modal = document.getElementById("mediaModal");
         const viewer = document.getElementById("modalViewer");
+        const item = mediaList[index];
         
-        if (type.includes("image")) {
-            viewer.innerHTML = `<img src="${url}" class="modal-content">`;
+        if (item.type.includes("image")) {
+            viewer.innerHTML = `<img src="${item.url}" class="modal-content">`;
+        } else if (item.type.includes("video")) {
+            viewer.innerHTML = `<video src="${item.url}" class="modal-content" controls autoplay></video>`;
         }
+        
         modal.style.display = "flex";
+    }
+
+    // Chuyển ảnh qua lại (tiến +1 hoặc lùi -1)
+    function changeMedia(direction) {
+        let newIndex = currentMediaIndex + direction;
+        
+        // Tạo vòng lặp vô hạn (nếu hết ảnh thì quay lại từ đầu và ngược lại)
+        if (newIndex >= mediaList.length) newIndex = 0;
+        if (newIndex < 0) newIndex = mediaList.length - 1;
+        
+        openModalAtIndex(newIndex);
     }
 
     function closeModal() {
         const modal = document.getElementById("mediaModal");
         const viewer = document.getElementById("modalViewer");
         modal.style.display = "none";
-        viewer.innerHTML = "";
+        viewer.innerHTML = ""; // Xóa nội dung để tắt hẳn tiếng của video
     }
 
+    // Đóng khung xem khi bấm vào vùng nền đen phía sau
     document.getElementById("mediaModal").addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
+        if (e.target === this || e.target === document.getElementById("modalViewer")) {
+            closeModal();
+        }
+    });
+
+    // Thêm phím mũi tên bàn phím máy tính để điều khiển cho tiện lợi
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById("mediaModal");
+        if (modal.style.display === "flex") {
+            if (e.key === "ArrowLeft") changeMedia(-1);
+            if (e.key === "ArrowRight") changeMedia(1);
+            if (e.key === "Escape") closeModal();
+        }
     });
 </script>
 </body>
