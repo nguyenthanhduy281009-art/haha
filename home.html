@@ -31,11 +31,27 @@
         .close-modal { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; cursor: pointer; font-weight: bold; transition: 0.2s; z-index: 1010; }
         .close-modal:hover { color: #e94560; }
 
-        /* Nút mũi tên chuyển ảnh */
-        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.15); color: white; border: none; font-size: 35px; padding: 15px 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; z-index: 1010; }
-        .nav-btn:hover { background: rgba(233, 69, 96, 0.8); }
-        .prev-btn { left: 30px; }
-        .next-btn { right: 30px; }
+       /* Nút mũi tên chuyển ảnh - Cố định ở rìa màn hình */
+.nav-btn { 
+    position: fixed; /* Cố định vị trí */
+    top: 50%; 
+    transform: translateY(-50%); 
+    background: rgba(0, 0, 0, 0.2); /* Nền cực mờ */
+    color: rgba(255, 255, 255, 0.4); /* Chữ mờ vừa đủ thấy */
+    border: none; 
+    font-size: 40px; 
+    padding: 20px; 
+    cursor: pointer; 
+    transition: opacity 0.5s ease, background 0.3s; 
+    z-index: 1020; 
+    opacity: 0; /* Mặc định ẩn */
+}
+.nav-btn:hover {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+}
+.prev-btn { left: 0; border-radius: 0 10px 10px 0; }
+.next-btn { right: 0; border-radius: 10px 0 0 10px; }
     </style>
 </head>
 <body>
@@ -178,18 +194,29 @@
         if (index < 0 || index >= mediaList.length) return;
         
         currentMediaIndex = index;
-        const modal = document.getElementById("mediaModal");
-        const viewer = document.getElementById("modalViewer");
-        const item = mediaList[index];
-        
-        if (item.type.includes("image")) {
-            viewer.innerHTML = `<img src="${item.url}" class="modal-content">`;
-        } else if (item.type.includes("video")) {
-            viewer.innerHTML = `<video src="${item.url}" class="modal-content" controls autoplay></video>`;
-        }
-        
-        modal.style.display = "flex";
-    }
+       const modal = document.getElementById("mediaModal");
+let hideTimeout;
+
+// Theo dõi di chuyển chuột trong toàn bộ khung modal
+modal.addEventListener("mousemove", function() {
+    const btns = document.querySelectorAll(".nav-btn");
+    btns.forEach(btn => btn.style.opacity = "1"); // Hiện lên rõ
+
+    // Tự động mờ đi sau 1.5 giây
+    clearTimeout(hideTimeout);
+    hideTimeout = setTimeout(() => {
+        btns.forEach(btn => btn.style.opacity = "0.3"); // Giữ lại độ mờ nhẹ
+    }, 1500);
+});
+
+// Khi đóng modal thì ẩn hẳn
+function closeModal() {
+    const modal = document.getElementById("mediaModal");
+    modal.style.display = "none";
+    document.getElementById("modalViewer").innerHTML = "";
+    document.querySelectorAll(".nav-btn").forEach(btn => btn.style.opacity = "0");
+    clearTimeout(hideTimeout);
+}
 
     // Chuyển ảnh qua lại (tiến +1 hoặc lùi -1)
     function changeMedia(direction) {
