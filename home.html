@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thư viện Media</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        button { padding: 10px 15px; background: #e94560; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        img, video { width: 100%; height: 200px; object-fit: cover; border-radius: 8px; }
+        #status { color: #e94560; font-size: 14px; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>Thư viện của bạn</h2>
+        <button onclick="firebase.auth().signOut()">Đăng xuất</button>
+    </div>
+
+    <div>
+        <input type="file" id="fileInput" accept="image/*,video/*">
+        <button onclick="uploadFile()">Tải lên</button>
+        <span id="status"></span>
+    </div>
+
+    <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCmLLI3wHywsLB33QmJDSgUzQcfS3GJgso",
+        authDomain: "haha-ba0bc.firebaseapp.com",
+        projectId: "haha-ba0bc",
+        storageBucket: "haha-ba0bc.firebasestorage.app",
+        messagingSenderId: "748739861694",
+        appId: "1:748739861694:web:492d2a164fec150840d2ef",
+        measurementId: "G-DFQ8DYRZ1G",
+        databaseURL: "https://haha-ba0bc-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+    let currentUser = null;
+
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            currentUser = user;
+            loadMedia();
+        } else {
+            window.location.href = "index.html";
+        }
+    });
+
+    async function uploadFile() {
+        const file = document.getElementById("fileInput").files[0];
+        const statusTxt = document.getElementById("status");
+        
+        if (!file) return statusTxt.innerText = "Vui lòng chọn file!";
+        statusTxt.innerText = "Đang tải lên...";
+
+        const storageRef = firebase.storage().ref(`users/${currentUser.uid}/${Date.now()}_${file.name}`);
+
+        try {
+            const snapshot = await storageRef.put(file);
+            const url = await snapshot.ref.getDownloadURL();
+
+            await firebase.database().ref(`media/${currentUser.uid}`).push({
+                url: url,
+                type: file.type
+            });
+
+            statusTxt.innerText = "Tải lên thành công!";
+            document.getElementById("fileInput").value = "";
+        } catch (e) {
+            statusTxt.innerText = "Lỗi: " + e.message;
+        }
+    }
+
+    function loadMedia() {
+        firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
+            const gallery = document.getElementById("gallery");
+            gallery.innerHTML = "";
+            snapshot.forEach((childSnapshot) => {
+                const data = childSnapshot.val();
+                const div = document.createElement("div");
+                
+                if (data.type.includes("image")) {
+                    div.innerHTML = `<img src="${data.url}">`;
+                } else if (data.type.includes("video")) {
+                    div.innerHTML = `<video src="${data.url}" controls></video>`;
+                }
+                
+                gallery.appendChild(div);
+            });
+        });
+    }
+</script>
+</body>
+</html>
