@@ -7,7 +7,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -78,34 +77,40 @@
         }
     });
 
-    async function uploadFile() {
+    function uploadFile() {
         const file = document.getElementById("fileInput").files[0];
         const statusTxt = document.getElementById("status");
         
         if (!file) return statusTxt.innerText = "Vui lòng chọn file!";
-        statusTxt.innerText = "Đang tải lên...";
-
-        const fileName = `${Date.now()}_${file.name}`;
-        const filePath = `users/${currentUser.uid}/${fileName}`;
-        const storageRef = firebase.storage().ref(filePath);
-
-        try {
-            const snapshot = await storageRef.put(file);
-            const url = await snapshot.ref.getDownloadURL();
-
-            // Lưu thêm filePath để sau này có thể xóa
-            await firebase.database().ref(`media/${currentUser.uid}`).push({
-                url: url,
-                type: file.type,
-                path: filePath 
-            });
-
-            statusTxt.innerText = "Tải lên thành công!";
-            document.getElementById("fileInput").value = "";
-            setTimeout(() => statusTxt.innerText = "", 3000);
-        } catch (e) {
-            statusTxt.innerText = "Lỗi: " + e.message;
+        
+        // Giới hạn dung lượng file dưới 7MB để database chạy mượt
+        if (file.size > 7 * 1024 * 1024) {
+            return statusTxt.innerText = "File quá lớn! Hãy chọn file dưới 7MB.";
         }
+
+        statusTxt.innerText = "Đang xử lý và tải lên...";
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async function () {
+            const base64Data = reader.result;
+
+            try {
+                await firebase.database().ref(`media/${currentUser.uid}`).push({
+                    url: base64Data,
+                    type: file.type
+                });
+
+                statusTxt.innerText = "Tải lên thành công!";
+                document.getElementById("fileInput").value = "";
+                setTimeout(() => statusTxt.innerText = "", 3000);
+            } catch (e) {
+                statusTxt.innerText = "Lỗi: " + e.message;
+            }
+        };
+        reader.onerror = function () {
+            statusTxt.innerText = "Lỗi khi đọc file!";
+        };
     }
 
     function loadMedia() {
@@ -125,33 +130,27 @@
                 if (data.type.includes("image")) {
                     mediaElement = `<img src="${data.url}" ${clickAction}>`;
                 } else if (data.type.includes("video")) {
-                    // Tắt click trực tiếp mở modal cho video để người dùng có thể bấm nút Play
                     mediaElement = `<video src="${data.url}" controls></video>`;
                 }
                 
                 div.innerHTML = `
                     ${mediaElement}
-                    <button class="delete-btn" onclick="deleteFile('${key}', '${data.path}')">Xóa</button>
+                    <button class="delete-btn" onclick="deleteFile('${key}')">Xóa</button>
                 `;
-                gallery.prepend(div); // Thêm file mới lên đầu
+                gallery.prepend(div);
             });
         });
     }
 
-    async function deleteFile(dbKey, storagePath) {
+    async function deleteFile(dbKey) {
         if (!confirm("Bạn có chắc chắn muốn xóa tệp này?")) return;
-        
         try {
-            // Xóa file trên Storage
-            await firebase.storage().ref(storagePath).delete();
-            // Xóa dữ liệu trên Database
             await firebase.database().ref(`media/${currentUser.uid}/${dbKey}`).remove();
         } catch (e) {
             alert("Lỗi khi xóa: " + e.message);
         }
     }
 
-    // Các hàm xử lý phóng to
     function openModal(url, type) {
         const modal = document.getElementById("mediaModal");
         const viewer = document.getElementById("modalViewer");
@@ -166,10 +165,9 @@
         const modal = document.getElementById("mediaModal");
         const viewer = document.getElementById("modalViewer");
         modal.style.display = "none";
-        viewer.innerHTML = ""; // Xóa nội dung để dừng video (nếu có)
+        viewer.innerHTML = "";
     }
 
-    // Đóng modal khi click ra ngoài ảnh
     document.getElementById("mediaModal").addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
