@@ -226,7 +226,7 @@
     function closeModal() { document.getElementById("mediaModal").style.display = "none"; }
 
     async function deleteFile(dbKey) {
-    if (!confirm("Bạn có chắc muốn xóa không?")) return;
+    if (!confirm("Bạn có chắc chắn muốn xóa không?")) return;
 
     try {
         await firebase.database()
