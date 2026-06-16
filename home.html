@@ -83,7 +83,52 @@
         else { window.location.href = "index.html"; }
     });
 
-    function uploadFile() { /* Logic cũ giữ nguyên */ }
+    function uploadFile() {
+    const file = document.getElementById("fileInput").files[0];
+    const statusTxt = document.getElementById("status");
+
+    if (!file) {
+        statusTxt.innerText = "Vui lòng chọn file!";
+        return;
+    }
+
+    if (file.size > 7 * 1024 * 1024) {
+        statusTxt.innerText = "File quá lớn! Hãy chọn file dưới 7MB.";
+        return;
+    }
+
+    statusTxt.innerText = "Đang tải lên...";
+
+    const reader = new FileReader();
+
+    reader.onload = async () => {
+        try {
+            await firebase.database()
+                .ref(`media/${currentUser.uid}`)
+                .push({
+                    url: reader.result,
+                    type: file.type,
+                    createdAt: Date.now()
+                });
+
+            statusTxt.innerText = "Tải lên thành công!";
+            document.getElementById("fileInput").value = "";
+
+            setTimeout(() => {
+                statusTxt.innerText = "";
+            }, 3000);
+
+        } catch (err) {
+            statusTxt.innerText = "Lỗi: " + err.message;
+        }
+    };
+
+    reader.onerror = () => {
+        statusTxt.innerText = "Lỗi khi đọc file!";
+    };
+
+    reader.readAsDataURL(file);
+}
 
     function loadMedia() {
         firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
