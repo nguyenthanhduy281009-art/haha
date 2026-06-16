@@ -31,79 +31,12 @@
         .close-modal { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; cursor: pointer; font-weight: bold; transition: 0.2s; z-index: 1010; }
         .close-modal:hover { color: #e94560; }
 
-        .close-modal,
-.nav-btn {
-    opacity: 0;
-    transition: opacity .3s ease, background .3s ease;
-    pointer-events: none;
-}
-
-.modal.show-controls .close-modal,
-.modal.show-controls .nav-btn {
-    opacity: .45;
-    pointer-events: auto;
-}
-
-.close-modal:hover,
-.nav-btn:hover {
-    opacity: .9 !important;
-}
-
-.close-modal {
-    position: fixed;
-    top: 15px;
-    right: 25px;
-    color: #fff;
-    font-size: 42px;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 9999;
-}
-
-.nav-btn {
-    position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(255,255,255,.12);
-    color: #fff;
-    border: none;
-    font-size: 35px;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    cursor: pointer;
-    z-index: 9999;
-    backdrop-filter: blur(4px);
-}
-
-.prev-btn {
-    left: 15px;
-}
-
-.next-btn {
-    right: 15px;
-}
-
-/* Zoom + Pan */
-
-#modalViewer {
-    overflow: hidden;
-    cursor: grab;
-}
-
-#modalViewer.dragging {
-    cursor: grabbing;
-}
-
-.zoomable {
-    transform-origin: center center;
-    transition: transform .05s linear;
-    max-width: 85%;
-    max-height: 85%;
-    will-change: transform;
-}
-
-</style>
+        /* Nút mũi tên chuyển ảnh */
+        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.15); color: white; border: none; font-size: 35px; padding: 15px 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; z-index: 1010; }
+        .nav-btn:hover { background: rgba(233, 69, 96, 0.8); }
+        .prev-btn { left: 30px; }
+        .next-btn { right: 30px; }
+    </style>
 </head>
 <body>
 
@@ -144,17 +77,8 @@
 
     let currentUser = null;
     let mediaList = []; // Mảng danh sách để quản lý thứ tự hình ảnh/video khi lướt xem
-    let currentMediaIndex = -1;
+    let currentMediaIndex = -1; // Vị trí file đang mở phóng to
 
-let scale = 1;
-let translateX = 0;
-let translateY = 0;
-
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-
-let hideControlsTimer = null;
     firebase.auth().onAuthStateChanged((user) => {
         if (user) {
             currentUser = user;
@@ -214,7 +138,6 @@ let hideControlsTimer = null;
 
                 const div = document.createElement("div");
                 div.className = "media-card";
-                div.draggable = true;
                 
                 let mediaElement = "";
                 if (data.type.includes("image")) {
@@ -260,15 +183,12 @@ let hideControlsTimer = null;
         const item = mediaList[index];
         
         if (item.type.includes("image")) {
-            viewer.innerHTML = `<img src="${item.url}" class="modal-content zoomable">`;
+            viewer.innerHTML = `<img src="${item.url}" class="modal-content">`;
         } else if (item.type.includes("video")) {
-            viewer.innerHTML = `<video src="${item.url}" class="modal-content zoomable" controls autoplay></video>`;
+            viewer.innerHTML = `<video src="${item.url}" class="modal-content" controls autoplay></video>`;
         }
         
         modal.style.display = "flex";
-        resetZoomPan();
-        attachZoomPan();
-        showControls();
     }
 
     // Chuyển ảnh qua lại (tiến +1 hoặc lùi -1)
@@ -304,121 +224,7 @@ let hideControlsTimer = null;
             if (e.key === "ArrowRight") changeMedia(1);
             if (e.key === "Escape") closeModal();
         }
-   function resetZoomPan() {
-    scale = 1;
-    translateX = 0;
-    translateY = 0;
-}
-
-function updateTransform() {
-    const media = document.querySelector(".zoomable");
-
-    if (!media) return;
-
-    media.style.transform =
-        `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-}
-
-function attachZoomPan() {
-
-    const viewer = document.getElementById("modalViewer");
-    const media = document.querySelector(".zoomable");
-
-    if (!media) return;
-
-    media.addEventListener("wheel", function(e) {
-
-        e.preventDefault();
-
-        if (e.deltaY < 0) {
-            scale += 0.1;
-        } else {
-            scale -= 0.1;
-        }
-
-        scale = Math.max(0.5, Math.min(3, scale));
-
-        updateTransform();
-
-    }, { passive:false });
-
-    media.addEventListener("mousedown", function(e) {
-
-        if (scale <= 1) return;
-
-        isDragging = true;
-
-        viewer.classList.add("dragging");
-
-        startX = e.clientX - translateX;
-        startY = e.clientY - translateY;
     });
-
-    document.addEventListener("mousemove", dragMedia);
-
-    document.addEventListener("mouseup", stopDragging);
-}
-let draggedCard = null;
-
-document.addEventListener("dragstart", (e) => {
-
-    if (!e.target.classList.contains("media-card")) return;
-
-    draggedCard = e.target;
-});
-
-document.addEventListener("dragover", (e) => {
-
-    e.preventDefault();
-});
-
-document.addEventListener("drop", (e) => {
-
-    const target = e.target.closest(".media-card");
-
-    if (!target || target === draggedCard) return;
-
-    const gallery = document.getElementById("gallery");
-
-    gallery.insertBefore(draggedCard, target);
-});
-
-function dragMedia(e) {
-
-    if (!isDragging) return;
-
-    translateX = e.clientX - startX;
-    translateY = e.clientY - startY;
-
-    updateTransform();
-}
-
-function stopDragging() {
-
-    isDragging = false;
-
-    document
-        .getElementById("modalViewer")
-        .classList.remove("dragging");
-} 
-function showControls() {
-
-    const modal = document.getElementById("mediaModal");
-
-    modal.classList.add("show-controls");
-
-    clearTimeout(hideControlsTimer);
-
-    hideControlsTimer = setTimeout(() => {
-
-        modal.classList.remove("show-controls");
-
-    }, 1500);
-}        
-    });
-    document
-.getElementById("mediaModal")
-.addEventListener("mousemove", showControls);
 </script>
 </body>
 </html>
