@@ -4,177 +4,133 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thư viện Media</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
-        button { padding: 10px 15px; background: #e94560; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #d03b54; }
-        input[type="file"] { padding: 8px; border: 1px solid #ddd; border-radius: 8px; }
-        #status { color: #e94560; font-size: 14px; margin-left: 10px; font-weight: bold; }
-
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; }
+        
+        /* Gallery */
         .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
-        .media-card { position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background: #000; cursor: grab; }
-        .media-card img, .media-card video { width: 100%; height: 200px; object-fit: cover; display: block; transition: transform 0.3s; pointer-events: none; }
-        .media-card:hover img { transform: scale(1.05); }
-        .delete-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 0, 0, 0.8); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; z-index: 10; display: none; }
-        .media-card:hover .delete-btn { display: block; }
+        .media-card { position: relative; border-radius: 8px; overflow: hidden; background: #000; cursor: grab; }
+        .media-card:active { cursor: grabbing; }
+        .media-card img, .media-card video { width: 100%; height: 200px; object-fit: cover; display: block; pointer-events: none; }
 
-        /* Giao diện phóng to */
+        /* Modal */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; overflow: hidden; }
         
-        /* Container cho Zoom/Pan */
-        #zoomContainer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center; transition: transform 0.05s ease-out; cursor: grab; }
+        /* Container xử lý Zoom/Pan */
+        #zoomContainer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center; cursor: grab; }
         #zoomContainer:active { cursor: grabbing; }
+        /* QUAN TRỌNG: Ngăn trình duyệt kéo ảnh thay vì di chuyển (Pan) */
+        #zoomContainer img, #zoomContainer video { pointer-events: none; }
 
-        /* Nút điều hướng ẩn hiện thông minh */
-        .controls-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1010; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+        /* Controls */
+        .controls-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         .controls-layer.visible { opacity: 1; }
-        
-        .nav-btn, .close-modal { position: absolute; z-index: 1020; background: rgba(255, 255, 255, 0.15); color: white; border: none; padding: 15px 20px; border-radius: 50%; cursor: pointer; pointer-events: auto; }
-        .nav-btn { top: 50%; transform: translateY(-50%); font-size: 35px; }
-        .prev-btn { left: 30px; }
-        .next-btn { right: 30px; }
-        .close-modal { top: 20px; right: 30px; font-size: 40px; }
-        .nav-btn:hover, .close-modal:hover { background: rgba(233, 69, 96, 0.8); }
+        .nav-btn, .close-modal { position: absolute; z-index: 2001; background: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 15px 20px; border-radius: 50%; cursor: pointer; pointer-events: auto; }
+        .nav-btn { top: 50%; transform: translateY(-50%); }
+        .close-modal { top: 20px; right: 30px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
-        <h2>Thư viện của bạn</h2>
-        <button onclick="firebase.auth().signOut()">Đăng xuất</button>
-    </div>
-    <div>
-        <input type="file" id="fileInput" accept="image/*,video/*">
-        <button onclick="uploadFile()">Tải lên</button>
-        <span id="status"></span>
-    </div>
+    <div class="header"><h2>Thư viện</h2></div>
     <div class="gallery" id="gallery"></div>
 </div>
 
 <div id="mediaModal" class="modal">
     <div class="controls-layer" id="controlsLayer">
         <span class="close-modal" onclick="closeModal()">&times;</span>
-        <button class="nav-btn prev-btn" onclick="changeMedia(-1)">&#10094;</button>
-        <button class="nav-btn next-btn" onclick="changeMedia(1)">&#10095;</button>
+        <button class="nav-btn prev-btn" style="left:20px" onclick="changeMedia(-1)">&#10094;</button>
+        <button class="nav-btn next-btn" style="right:20px" onclick="changeMedia(1)">&#10095;</button>
     </div>
-    <div id="modalViewer" style="width: 100%; height: 100%; overflow: hidden;"></div>
+    <div id="modalViewer" style="width: 100%; height: 100%;"></div>
 </div>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyCmLLI3wHywsLB33QmJDSgUzQcfS3GJgso",
-        authDomain: "haha-ba0bc.firebaseapp.com",
-        projectId: "haha-ba0bc",
-        storageBucket: "haha-ba0bc.firebasestorage.app",
-        messagingSenderId: "748739861694",
-        appId: "1:748739861694:web:492d2a164fec150840d2ef",
-        measurementId: "G-DFQ8DYRZ1G",
-        databaseURL: "https://haha-ba0bc-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-
-    let currentUser = null, mediaList = [], currentMediaIndex = -1;
-    // Biến cho Zoom/Pan
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
     let hideTimeout;
+    
+    // --- FIX 1: Ẩn hiện UI ---
+    const modal = document.getElementById("mediaModal");
+    const controls = document.getElementById("controlsLayer");
 
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user) { currentUser = user; loadMedia(); }
-        else { window.location.href = "index.html"; }
-    });
+    modal.onmousemove = () => {
+        controls.classList.add("visible");
+        clearTimeout(hideTimeout);
+        // Sau 2 giây không di chuyển chuột, ẩn đi
+        hideTimeout = setTimeout(() => controls.classList.remove("visible"), 2000);
+    };
+    
+    modal.onmouseleave = () => controls.classList.remove("visible"); // Rời chuột khỏi modal là ẩn ngay
 
-    // --- CÁC HÀM CŨ (Giữ nguyên) ---
-    function uploadFile() { /* Logic cũ của bạn */ }
-    async function deleteFile(dbKey) { /* Logic cũ của bạn */ }
-
-    // --- LOAD & SẮP XẾP ---
-    function loadMedia() {
-        firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
-            const gallery = document.getElementById("gallery");
-            gallery.innerHTML = ""; mediaList = [];
-            
-            snapshot.forEach((childSnapshot) => {
-                const key = childSnapshot.key;
-                const data = childSnapshot.val();
-                mediaList.unshift({ key, url: data.url, type: data.type });
-                
-                const div = document.createElement("div");
-                div.className = "media-card";
-                div.draggable = true;
-                div.ondragstart = (e) => e.dataTransfer.setData("text", key);
-                div.ondragover = (e) => e.preventDefault();
-                div.ondrop = (e) => { /* Xử lý reorder ở đây nếu cần */ };
-                
-                div.innerHTML = `${data.type.includes("image") ? `<img src="${data.url}">` : `<video src="${data.url}"></video>`}
-                                 <button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${key}')">Xóa</button>`;
-                div.onclick = () => openModalAtIndex(mediaList.findIndex(m => m.key === key));
-                gallery.prepend(div);
-            });
-        });
-    }
-
-    // --- MỞ MODAL & ZOOM/PAN ---
     function openModalAtIndex(index) {
-        currentMediaIndex = index; scale = 1; posX = 0; posY = 0;
-        const modal = document.getElementById("mediaModal");
+        scale = 1; posX = 0; posY = 0;
         const viewer = document.getElementById("modalViewer");
         const item = mediaList[index];
         
         viewer.innerHTML = `<div id="zoomContainer">${item.type.includes("image") ? `<img src="${item.url}" style="max-width: 90vw; max-height: 90vh;">` : `<video src="${item.url}" style="max-width: 90vw; max-height: 90vh;" controls autoplay></video>`}</div>`;
-        
-        const container = document.getElementById("zoomContainer");
         modal.style.display = "flex";
 
-        // Zoom Mouse Wheel
-        container.onwheel = (e) => {
-            e.preventDefault();
-            scale = Math.min(Math.max(0.5, scale + (e.deltaY < 0 ? 0.2 : -0.2)), 3);
-            container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
-        };
+        const container = document.getElementById("zoomContainer");
+        container.style.transform = `scale(1) translate(0px, 0px)`;
 
-        // Pan Drag
-        container.onmousedown = (e) => { isDragging = true; startX = e.clientX - posX; startY = e.clientY - posY; };
-        window.onmousemove = (e) => {
-            if (!isDragging) return;
-            posX = e.clientX - startX; posY = e.clientY - startY;
-            container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
+        // --- FIX 2: Pan (Di chuyển) ---
+        container.onmousedown = (e) => {
+            isDragging = true;
+            startX = e.clientX - posX; 
+            startY = e.clientY - posY;
         };
-        window.onmouseup = () => isDragging = false;
     }
 
-    // --- HÀM ẨN HIỆN THÔNG MINH ---
-    document.getElementById("mediaModal").onmousemove = () => {
-        const layer = document.getElementById("controlsLayer");
-        layer.classList.add("visible");
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => layer.classList.remove("visible"), 2000);
+    // Sự kiện toàn màn hình để mượt mà khi di chuyển (Pan)
+    window.onmousemove = (e) => {
+        if (!isDragging) return;
+        posX = e.clientX - startX;
+        posY = e.clientY - startY;
+        const container = document.getElementById("zoomContainer");
+        if(container) container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
+    };
+    window.onmouseup = () => isDragging = false;
+
+    // Zoom
+    modal.onwheel = (e) => {
+        const container = document.getElementById("zoomContainer");
+        if(!container) return;
+        e.preventDefault();
+        scale = Math.min(Math.max(0.5, scale + (e.deltaY < 0 ? 0.2 : -0.2)), 3);
+        container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
     };
 
-    function changeMedia(direction) {
-        let newIndex = currentMediaIndex + direction;
-        if (newIndex >= mediaList.length) newIndex = 0;
-        if (newIndex < 0) newIndex = mediaList.length - 1;
-        openModalAtIndex(newIndex);
+    // --- FIX 3: Kéo thả sắp xếp ---
+    function renderGallery() {
+        const gallery = document.getElementById("gallery");
+        gallery.innerHTML = "";
+        mediaList.forEach((item, index) => {
+            const div = document.createElement("div");
+            div.className = "media-card";
+            div.draggable = true;
+            div.innerHTML = `<img src="${item.url}" style="${item.type.includes('video') ? 'filter: brightness(0.5)' : ''}">`;
+            
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData("text/plain", index);
+                div.style.opacity = "0.5";
+            };
+            div.ondragend = () => div.style.opacity = "1";
+            div.ondragover = (e) => e.preventDefault();
+            div.ondrop = (e) => {
+                e.preventDefault();
+                const fromIndex = e.dataTransfer.getData("text/plain");
+                const movedItem = mediaList.splice(fromIndex, 1)[0];
+                mediaList.splice(index, 0, movedItem);
+                renderGallery(); // Vẽ lại sau khi đổi chỗ
+            };
+            div.onclick = () => openModalAtIndex(index);
+            gallery.appendChild(div);
+        });
     }
 
-    function closeModal() {
-        document.getElementById("mediaModal").style.display = "none";
-        document.getElementById("modalViewer").innerHTML = "";
-    }
-
-    document.addEventListener('keydown', (e) => {
-        if (document.getElementById("mediaModal").style.display === "flex") {
-            if (e.key === "ArrowLeft") changeMedia(-1);
-            if (e.key === "ArrowRight") changeMedia(1);
-            if (e.key === "Escape") closeModal();
-        }
-    });
+    function closeModal() { modal.style.display = "none"; }
 </script>
 </body>
 </html>
