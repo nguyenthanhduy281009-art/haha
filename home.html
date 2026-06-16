@@ -2,75 +2,50 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thư viện Media</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
-        .media-card { position: relative; border-radius: 8px; overflow: hidden; background: #000; cursor: grab; }
-        .media-card img, .media-card video { width: 100%; height: 200px; object-fit: cover; pointer-events: none; }
-
-        /* Modal & Điều khiển */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; }
-        .viewer-wrapper { position: relative; cursor: grab; transition: transform 0.1s ease-out; display: inline-block; }
+        /* [GIỮ NGUYÊN CSS CŨ VÀ THÊM CÁC DÒNG NÀY] */
+        .viewer-wrapper { cursor: grab; transition: transform 0.1s; display: inline-block; }
         .viewer-wrapper:active { cursor: grabbing; }
-
-        .nav-btn, .close-modal {
-            position: fixed; z-index: 9999; background: rgba(0, 0, 0, 0.3); color: rgba(255, 255, 255, 0.4);
-            border: none; cursor: pointer; opacity: 0; transition: opacity 0.4s;
+        
+        .nav-btn, .close-modal { 
+            position: fixed !important; z-index: 99999 !important; 
+            opacity: 0; transition: opacity 0.4s;
         }
-        .nav-btn { top: 50%; transform: translateY(-50%); font-size: 50px; padding: 30px 20px; }
-        .prev-btn { left: 0; }
-        .next-btn { right: 0; }
-        .close-modal { top: 20px; right: 30px; font-size: 40px; }
+        #mediaModal:hover .nav-btn, #mediaModal:hover .close-modal { opacity: 0.5; }
+        .nav-btn:hover, .close-modal:hover { opacity: 1 !important; }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="gallery" id="gallery"></div>
-</div>
-
-<div id="mediaModal" class="modal">
-    <button class="close-modal" onclick="closeModal()">✕</button>
-    <button class="nav-btn prev-btn" onclick="changeMedia(-1)">&#10094;</button>
-    <div id="modalViewer" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;"></div>
-    <button class="nav-btn next-btn" onclick="changeMedia(1)">&#10095;</button>
-</div>
+    <div id="mediaModal" class="modal">
+        <span class="close-modal" onclick="closeModal()">✕</span>
+        <button class="nav-btn prev-btn" onclick="changeMedia(-1)">&#10094;</button>
+        <div id="modalViewer" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;"></div>
+        <button class="nav-btn next-btn" onclick="changeMedia(1)">&#10095;</button>
+    </div>
 
 <script>
-    // [Giữ nguyên cấu hình Firebase của bạn ở đây]
     let currentScale = 1, translateX = 0, translateY = 0, isDown = false;
     let startX, startY;
 
     function openModalAtIndex(index) {
+        if (index < 0 || index >= mediaList.length) return;
         currentMediaIndex = index;
         currentScale = 1; translateX = 0; translateY = 0;
-        const item = mediaList[index];
-        const viewer = document.getElementById("modalViewer");
+        
         const modal = document.getElementById("mediaModal");
+        const viewer = document.getElementById("modalViewer");
+        const item = mediaList[index];
 
         viewer.innerHTML = `
             <div class="viewer-wrapper" id="zoomWrapper">
-                ${item.type.includes("image") ? `<img src="${item.url}" id="mediaContent">` : `<video src="${item.url}" id="mediaContent" autoplay loop></video>`}
+                ${item.type.includes("image") ? `<img src="${item.url}" style="max-width: 90vw; max-height: 90vh;">` : `<video src="${item.url}" style="max-width: 90vw; max-height: 90vh;" controls autoplay></video>`}
             </div>
         `;
+        modal.style.display = "flex";
 
         const wrapper = document.getElementById("zoomWrapper");
-        const btns = document.querySelectorAll(".nav-btn, .close-modal");
-
-        // Ẩn hiện theo chuột
-        let timer;
-        modal.onmousemove = () => {
-            btns.forEach(b => b.style.opacity = "1");
-            clearTimeout(timer);
-            timer = setTimeout(() => btns.forEach(b => b.style.opacity = "0"), 1500);
-        };
-
+        
         // Zoom bằng lăn chuột
         wrapper.onwheel = (e) => {
             e.preventDefault();
@@ -79,7 +54,7 @@
             wrapper.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
         };
 
-        // Pan (Di chuyển)
+        // Kéo thả (Pan)
         wrapper.onmousedown = (e) => {
             isDown = true;
             startX = e.pageX - translateX;
@@ -92,16 +67,13 @@
             wrapper.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
         };
         window.onmouseup = () => isDown = false;
-
-        modal.style.display = "flex";
     }
 
+    // Hàm đóng
     function closeModal() {
         document.getElementById("mediaModal").style.display = "none";
         document.getElementById("modalViewer").innerHTML = "";
     }
-    
-    // [Các hàm loadMedia, uploadFile, changeMedia giữ nguyên logic cũ của bạn]
 </script>
 </body>
 </html>
