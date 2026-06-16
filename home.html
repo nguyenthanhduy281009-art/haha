@@ -23,19 +23,21 @@
         .delete-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 0, 0, 0.8); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; z-index: 10; display: none; }
         .media-card:hover .delete-btn { display: block; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; justify-content: center; align-items: center; user-select: none; }
-        .close-modal { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; cursor: pointer; font-weight: bold; transition: 0.2s; z-index: 1010; }
-        .close-modal:hover { color: #e94560; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; overflow: hidden; }
+        
+        #zoomContainer { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center; transition: transform 0.05s ease-out; cursor: grab; }
+        /* FIX: Cho phép chuột di chuyển ảnh không bị chặn bởi trình duyệt */
+        #zoomContainer img, #zoomContainer video { pointer-events: none; }
+        #zoomContainer:active { cursor: grabbing; }
 
-        /* MỚI: Nút ẩn hiện thông minh */
-        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.15); color: white; border: none; font-size: 35px; padding: 15px 20px; border-radius: 50%; cursor: pointer; transition: 0.3s; z-index: 1010; opacity: 0; }
-        .nav-btn.show { opacity: 1; }
+        .controls-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1010; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+        .controls-layer.visible { opacity: 1; }
+        
+        .nav-btn, .close-modal { position: absolute; z-index: 1020; background: rgba(255, 255, 255, 0.15); color: white; border: none; padding: 15px 20px; border-radius: 50%; cursor: pointer; pointer-events: auto; }
+        .nav-btn { top: 50%; transform: translateY(-50%); font-size: 35px; }
         .prev-btn { left: 30px; }
         .next-btn { right: 30px; }
-        
-        /* MỚI: Zoom & Pan */
-        #modalViewer { width: 100%; height: 100%; overflow: hidden; cursor: grab; display: flex; justify-content: center; align-items: center; }
-        #modalViewer img, #modalViewer video { transition: none; pointer-events: none; }
+        .close-modal { top: 20px; right: 30px; font-size: 40px; }
     </style>
 </head>
 <body>
@@ -54,10 +56,12 @@
 </div>
 
 <div id="mediaModal" class="modal">
-    <span class="close-modal" onclick="closeModal()" id="closeX" style="opacity:0">&times;</span>
-    <button class="nav-btn prev-btn" id="btnPrev" onclick="changeMedia(-1)">&#10094;</button>
-    <div id="modalViewer"></div>
-    <button class="nav-btn next-btn" id="btnNext" onclick="changeMedia(1)">&#10095;</button>
+    <div class="controls-layer" id="controlsLayer">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <button class="nav-btn prev-btn" onclick="changeMedia(-1)">&#10094;</button>
+        <button class="nav-btn next-btn" onclick="changeMedia(1)">&#10095;</button>
+    </div>
+    <div id="modalViewer" style="width: 100%; height: 100%; overflow: hidden;"></div>
 </div>
 
 <script>
@@ -73,32 +77,16 @@
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
-    let currentUser = null;
-    let mediaList = [];
-    let currentMediaIndex = -1;
-    // Biến cho Zoom/Pan
+    let currentUser = null, mediaList = [], currentMediaIndex = -1;
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
-    let hideTimer;
+    let hideTimeout;
 
     firebase.auth().onAuthStateChanged((user) => {
         if (user) { currentUser = user; loadMedia(); }
-        else { window.location.href = "index.html"; }
     });
 
-    function uploadFile() { /* Logic cũ giữ nguyên */ }
-
-    function loadMedia() {
-        firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
-            const gallery = document.getElementById("gallery");
-            gallery.innerHTML = "";
-            mediaList = [];
-            snapshot.forEach((childSnapshot) => {
-                const data = childSnapshot.val();
-                mediaList.unshift({ key: childSnapshot.key, url: data.url, type: data.type });
-            });
-            renderGallery();
-        });
-    }
+    function uploadFile() { /* Code cũ của bạn */ }
+    async function deleteFile(dbKey) { /* Code cũ của bạn */ }
 
     function renderGallery() {
         const gallery = document.getElementById("gallery");
@@ -106,21 +94,29 @@
         mediaList.forEach((item, index) => {
             const div = document.createElement("div");
             div.className = "media-card";
-            div.draggable = true; // Cho phép kéo
-            div.innerHTML = item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`;
-            div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
-            div.onclick = () => openModalAtIndex(index);
-            
-            // Logic Kéo thả sắp xếp
-            div.ondragstart = (e) => e.dataTransfer.setData("text", index);
+            div.draggable = true;
+            div.ondragstart = (e) => e.dataTransfer.setData("text/plain", index);
             div.ondragover = (e) => e.preventDefault();
             div.ondrop = (e) => {
-                const fromIdx = e.dataTransfer.getData("text");
-                const moved = mediaList.splice(fromIdx, 1)[0];
-                mediaList.splice(index, 0, moved);
-                renderGallery(); // Cập nhật lại
+                e.preventDefault();
+                const fromIdx = parseInt(e.dataTransfer.getData("text/plain"));
+                const movedItem = mediaList.splice(fromIdx, 1)[0];
+                mediaList.splice(index, 0, movedItem);
+                renderGallery();
             };
+
+            div.innerHTML = `${item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`}
+                               <button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
+            div.onclick = () => openModalAtIndex(index);
             gallery.appendChild(div);
+        });
+    }
+
+    function loadMedia() {
+        firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
+            mediaList = [];
+            snapshot.forEach((child) => mediaList.unshift({ key: child.key, ...child.val() }));
+            renderGallery();
         });
     }
 
@@ -129,52 +125,43 @@
         const modal = document.getElementById("mediaModal");
         const viewer = document.getElementById("modalViewer");
         const item = mediaList[index];
-        viewer.innerHTML = item.type.includes("image") ? `<img src="${item.url}" id="viewEl">` : `<video src="${item.url}" id="viewEl" controls autoplay></video>`;
+        
+        // Thêm loop ở đây cho video
+        viewer.innerHTML = `<div id="zoomContainer">${item.type.includes("image") ? `<img src="${item.url}" style="max-width: 90vw; max-height: 90vh;">` : `<video src="${item.url}" style="max-width: 90vw; max-height: 90vh;" controls autoplay loop></video>`}</div>`;
         modal.style.display = "flex";
+
+        const container = document.getElementById("zoomContainer");
         
-        // Logic Zoom/Pan
-        const viewEl = document.getElementById("viewEl");
-        viewEl.style.transform = `scale(1) translate(0px, 0px)`;
-        
-        viewer.onmousedown = (e) => { 
+        container.onmousedown = (e) => { 
             e.preventDefault(); 
             isDragging = true; startX = e.clientX - posX; startY = e.clientY - posY; 
         };
         window.onmousemove = (e) => {
-            if(isDragging) {
-                posX = e.clientX - startX; posY = e.clientY - startY;
-                viewEl.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
-            }
-            // Logic Ẩn hiện UI
-            showUI();
+            if (!isDragging) return;
+            posX = e.clientX - startX; posY = e.clientY - posY;
+            container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
         };
         window.onmouseup = () => isDragging = false;
-        
-        viewer.onwheel = (e) => {
+
+        container.onwheel = (e) => {
             e.preventDefault();
-            scale += e.deltaY * -0.001;
-            scale = Math.min(Math.max(0.5, scale), 3);
-            viewEl.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
+            scale = Math.min(Math.max(0.5, scale + (e.deltaY < 0 ? 0.2 : -0.2)), 3);
+            container.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
         };
     }
 
-    function showUI() {
-        document.getElementById("btnPrev").classList.add("show");
-        document.getElementById("btnNext").classList.add("show");
-        document.getElementById("closeX").style.opacity = 1;
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => {
-            document.getElementById("btnPrev").classList.remove("show");
-            document.getElementById("btnNext").classList.remove("show");
-            document.getElementById("closeX").style.opacity = 0;
-        }, 2000);
-    }
+    document.getElementById("mediaModal").onmousemove = () => {
+        const layer = document.getElementById("controlsLayer");
+        layer.classList.add("visible");
+        clearTimeout(hideTimeout);
+        hideTimeout = setTimeout(() => layer.classList.remove("visible"), 2000);
+    };
 
-    function changeMedia(dir) {
-        currentMediaIndex += dir;
-        if (currentMediaIndex >= mediaList.length) currentMediaIndex = 0;
-        if (currentMediaIndex < 0) currentMediaIndex = mediaList.length - 1;
-        openModalAtIndex(currentMediaIndex);
+    function changeMedia(direction) {
+        let newIndex = currentMediaIndex + direction;
+        if (newIndex >= mediaList.length) newIndex = 0;
+        if (newIndex < 0) newIndex = mediaList.length - 1;
+        openModalAtIndex(newIndex);
     }
 
     function closeModal() { document.getElementById("mediaModal").style.display = "none"; }
