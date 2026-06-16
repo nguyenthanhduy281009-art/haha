@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -33,7 +34,6 @@
         .next-btn { right: 30px; }
         
         #modalViewer { width: 100%; height: 100%; overflow: hidden; cursor: grab; display: flex; justify-content: center; align-items: center; }
-        /* Xóa pointer-events: none để video controls hoạt động */
         #modalViewer img, #modalViewer video { transition: none; }
     </style>
 </head>
@@ -83,7 +83,35 @@
         else { window.location.href = "index.html"; }
     });
 
-    function uploadFile() { /* Logic cũ giữ nguyên */ }
+    // --- HÀM TẢI LÊN ---
+    function uploadFile() {
+        const fileInput = document.getElementById("fileInput");
+        const status = document.getElementById("status");
+        const file = fileInput.files[0];
+        if (!file) return alert("Vui lòng chọn ảnh hoặc video!");
+
+        status.innerText = "Đang tải...";
+        const storageRef = firebase.storage().ref(`media/${currentUser.uid}/${Date.now()}_${file.name}`);
+        
+        storageRef.put(file).then(snapshot => {
+            snapshot.ref.getDownloadURL().then(url => {
+                firebase.database().ref(`media/${currentUser.uid}`).push({
+                    url: url,
+                    type: file.type
+                }).then(() => {
+                    status.innerText = "Tải xong!";
+                    fileInput.value = "";
+                    setTimeout(() => status.innerText = "", 2000);
+                });
+            });
+        }).catch(err => status.innerText = "Lỗi: " + err.message);
+    }
+
+    // --- HÀM XÓA ---
+    async function deleteFile(dbKey) {
+        if (!confirm("Bạn muốn xóa mục này?")) return;
+        await firebase.database().ref(`media/${currentUser.uid}/${dbKey}`).remove();
+    }
 
     function loadMedia() {
         firebase.database().ref(`media/${currentUser.uid}`).on("value", (snapshot) => {
@@ -127,7 +155,6 @@
         const viewer = document.getElementById("modalViewer");
         const item = mediaList[index];
         
-        // Thêm loop và style fit
         const baseStyle = 'max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: grab;';
         viewer.innerHTML = item.type.includes("image") ? 
             `<img src="${item.url}" id="viewEl" style="${baseStyle}">` : 
@@ -144,7 +171,7 @@
         };
         window.onmousemove = (e) => {
             if(isDragging) {
-                posX = e.clientX - startX; posY = e.clientY - startY;
+                posX = e.clientX - startX; posY = e.clientY - posY;
                 viewEl.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
             }
             showUI();
