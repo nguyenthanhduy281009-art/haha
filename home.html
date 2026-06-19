@@ -190,8 +190,8 @@ function uploadFile(mode) {
     const gallery = document.getElementById("gallery");
     gallery.innerHTML = "";
     
-    // CHỈ LẤY CÁC FILE CÓ MODE LÀ 'normal'
-    const displayList = mediaList.filter(item => item.mode === 'normal');
+    // LỌC: Chỉ hiện nếu mode là 'normal' HOẶC file chưa có mode (để file cũ vẫn hiện)
+    const displayList = mediaList.filter(item => !item.mode || item.mode === 'normal');
 
     displayList.forEach((item) => {
         const index = mediaList.indexOf(item); 
@@ -203,7 +203,15 @@ function uploadFile(mode) {
         div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
         div.onclick = () => openModalAtIndex(index);
         
-        // ... (Giữ nguyên logic drag & drop cũ) ...
+        // ĐẦY ĐỦ LOGIC KÉO THẢ (Đã khôi phục)
+        div.ondragstart = (e) => e.dataTransfer.setData("text", index);
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+            const fromIdx = e.dataTransfer.getData("text");
+            const moved = mediaList.splice(fromIdx, 1)[0];
+            mediaList.splice(index, 0, moved);
+            renderGallery();
+        };
         gallery.appendChild(div);
     });
 }
