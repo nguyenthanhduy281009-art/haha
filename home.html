@@ -200,11 +200,11 @@ function uploadFile(mode) {
     const viewer = document.getElementById("modalViewer");
     const item = mediaList[index];
     
-    // Logic: Nếu mode là 'audio', bất kể file gốc là gì, chỉ dùng thẻ <audio>
+    // 1. Kiểm tra mode, ưu tiên xử lý audio
+    // Nếu item.mode là 'audio', dùng thẻ audio. Nếu không thì dùng hình/video cũ
     if (item.mode === 'audio') {
-        viewer.innerHTML = `<audio src="${item.url}" controls autoplay style="width: 80%;"></audio>`;
+        viewer.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; width:100%"><audio src="${item.url}" controls autoplay></audio></div>`;
     } else {
-        // Nếu là 'normal', giữ nguyên logic cũ của bạn
         const baseStyle = 'max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: grab;';
         viewer.innerHTML = item.type.includes("image") ? 
             `<img src="${item.url}" id="viewEl" style="${baseStyle}">` : 
@@ -212,9 +212,9 @@ function uploadFile(mode) {
     }
     
     modal.style.display = "flex";
-    // ... giữ nguyên phần xử lý kéo thả (onmousedown, onmousemove...) phía dưới ...
-}
-        
+
+    // 2. Chỉ khởi tạo sự kiện kéo thả nếu KHÔNG PHẢI là audio (vì audio không cần kéo)
+    if (item.mode !== 'audio') {
         const viewEl = document.getElementById("viewEl");
         viewEl.style.transform = `scale(1) translate(0px, 0px)`;
         
@@ -222,6 +222,7 @@ function uploadFile(mode) {
             e.preventDefault(); 
             isDragging = true; startX = e.clientX - posX; startY = e.clientY - posY; 
         };
+        // Các sự kiện window cần được gắn vào trong phạm vi này hoặc quản lý cẩn thận
         window.onmousemove = (e) => {
             if(isDragging) {
                 posX = e.clientX - startX; posY = e.clientY - startY;
@@ -238,7 +239,7 @@ function uploadFile(mode) {
             viewEl.style.transform = `scale(${scale}) translate(${posX}px, ${posY}px)`;
         };
     }
-
+}
     function showUI() {
         document.getElementById("btnPrev").classList.add("show");
         document.getElementById("btnNext").classList.add("show");
