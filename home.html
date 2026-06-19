@@ -104,9 +104,12 @@ function toggleMusicList() {
 }
 
 // Lọc nhạc từ mediaList (chỉ lấy file có type là audio)
+// Thay thế hàm loadAudioFiles cũ bằng đoạn này
 function loadAudioFiles() {
     const listDiv = document.getElementById("musicList");
     listDiv.innerHTML = "";
+    
+    // Chỉ lấy những file có mode là 'audio'
     audioList = mediaList.filter(item => item.mode === 'audio');
     
     audioList.forEach((item, index) => {
@@ -114,14 +117,21 @@ function loadAudioFiles() {
         div.className = "music-item";
         div.style.display = "flex";
         div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+        
+        // Tạo HTML bao gồm tên bài và nút xóa
         div.innerHTML = `
-            <span onclick="playAudio(${mediaList.indexOf(item)})">🎵 Track ${index + 1}</span>
-            <button onclick="deleteFile('${item.key}')" style="background:red; padding:2px 5px; font-size:10px;">Xóa</button>
+            <span onclick="playAudio(${mediaList.indexOf(item)})" style="cursor:pointer; flex-grow:1;">
+                🎵 Nhạc ${index + 1}
+            </span>
+            <button onclick="event.stopPropagation(); deleteFile('${item.key}')" 
+                    style="background:#ff4d4d; color:white; border:none; padding:3px 8px; border-radius:4px; font-size:12px; cursor:pointer;">
+                Xóa
+            </button>
         `;
         listDiv.appendChild(div);
     });
 }
-
 function playAudio(index) {
     if (currentAudio.src === audioList[index].url && !currentAudio.paused) {
         currentAudio.pause(); // Bấm lại để dừng
