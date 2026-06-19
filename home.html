@@ -172,37 +172,27 @@ function uploadFile(mode) {
     }
 
     function renderGallery() {
-    const gallery = document.getElementById("gallery");
-    gallery.innerHTML = "";
-    
-    // CHỈ LẤY NHỮNG FILE CÓ MODE LÀ 'normal' (hoặc chưa có mode)
-    // Các file có mode 'audio' sẽ bị lọc bỏ khỏi thư viện chính
-    const displayList = mediaList.filter(item => item.mode !== 'audio');
-
-    displayList.forEach((item, index) => {
-        const div = document.createElement("div");
-        div.className = "media-card";
-        div.draggable = true;
-        
-        // Tìm lại index gốc trong mediaList để mở modal đúng
-        const originalIndex = mediaList.indexOf(item);
-        
-        div.innerHTML = item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`;
-        div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
-        div.onclick = () => openModalAtIndex(originalIndex);
-        
-        // Giữ nguyên phần logic kéo thả (drag & drop) như cũ
-        div.ondragstart = (e) => e.dataTransfer.setData("text", originalIndex);
-        div.ondragover = (e) => e.preventDefault();
-        div.ondrop = (e) => {
-            const fromIdx = e.dataTransfer.getData("text");
-            const moved = mediaList.splice(fromIdx, 1)[0];
-            mediaList.splice(originalIndex, 0, moved);
-            renderGallery();
-        };
-        gallery.appendChild(div);
-    });
-}
+        const gallery = document.getElementById("gallery");
+        gallery.innerHTML = "";
+        mediaList.forEach((item, index) => {
+            const div = document.createElement("div");
+            div.className = "media-card";
+            div.draggable = true;
+            div.innerHTML = item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`;
+            div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
+            div.onclick = () => openModalAtIndex(index);
+            
+            div.ondragstart = (e) => e.dataTransfer.setData("text", index);
+            div.ondragover = (e) => e.preventDefault();
+            div.ondrop = (e) => {
+                const fromIdx = e.dataTransfer.getData("text");
+                const moved = mediaList.splice(fromIdx, 1)[0];
+                mediaList.splice(index, 0, moved);
+                renderGallery();
+            };
+            gallery.appendChild(div);
+        });
+    }
 
     function openModalAtIndex(index) {
     currentMediaIndex = index; scale = 1; posX = 0; posY = 0;
