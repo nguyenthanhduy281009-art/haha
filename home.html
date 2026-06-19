@@ -107,13 +107,17 @@ function toggleMusicList() {
 function loadAudioFiles() {
     const listDiv = document.getElementById("musicList");
     listDiv.innerHTML = "";
-    audioList = mediaList.filter(item => item.type.includes("audio"));
+    audioList = mediaList.filter(item => item.mode === 'audio');
     
     audioList.forEach((item, index) => {
         const div = document.createElement("div");
         div.className = "music-item";
-        div.innerText = "Audio " + (index + 1);
-        div.onclick = () => playAudio(index);
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.innerHTML = `
+            <span onclick="playAudio(${mediaList.indexOf(item)})">🎵 Track ${index + 1}</span>
+            <button onclick="deleteFile('${item.key}')" style="background:red; padding:2px 5px; font-size:10px;">Xóa</button>
+        `;
         listDiv.appendChild(div);
     });
 }
@@ -172,28 +176,35 @@ function uploadFile(mode) {
     }
 
     function renderGallery() {
-        const gallery = document.getElementById("gallery");
-        gallery.innerHTML = "";
-        mediaList.forEach((item, index) => {
-            const div = document.createElement("div");
-            div.className = "media-card";
-            div.draggable = true;
-            div.innerHTML = item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`;
-            div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
-            div.onclick = () => openModalAtIndex(index);
-            
-            div.ondragstart = (e) => e.dataTransfer.setData("text", index);
-            div.ondragover = (e) => e.preventDefault();
-            div.ondrop = (e) => {
-                const fromIdx = e.dataTransfer.getData("text");
-                const moved = mediaList.splice(fromIdx, 1)[0];
-                mediaList.splice(index, 0, moved);
-                renderGallery();
-            };
-            gallery.appendChild(div);
-        });
-    }
+    const gallery = document.getElementById("gallery");
+    gallery.innerHTML = "";
+    
+    // Lọc: Chỉ lấy những file KHÔNG phải mode 'audio' để hiện ở thư viện
+    const displayList = mediaList.filter(item => item.mode !== 'audio');
 
+    displayList.forEach((item) => {
+        // Tìm lại chỉ mục thực sự của item trong mảng mediaList gốc (để kéo thả và xóa đúng)
+        const index = mediaList.indexOf(item);
+        
+        const div = document.createElement("div");
+        div.className = "media-card";
+        div.draggable = true;
+        
+        div.innerHTML = item.type.includes("image") ? `<img src="${item.url}">` : `<video src="${item.url}"></video>`;
+        div.innerHTML += `<button class="delete-btn" onclick="event.stopPropagation(); deleteFile('${item.key}')">Xóa</button>`;
+        div.onclick = () => openModalAtIndex(index);
+        
+        div.ondragstart = (e) => e.dataTransfer.setData("text", index);
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+            const fromIdx = e.dataTransfer.getData("text");
+            const moved = mediaList.splice(fromIdx, 1)[0];
+            mediaList.splice(index, 0, moved);
+            renderGallery();
+        };
+        gallery.appendChild(div);
+    });
+}
     function openModalAtIndex(index) {
     currentMediaIndex = index; scale = 1; posX = 0; posY = 0;
     const modal = document.getElementById("mediaModal");
